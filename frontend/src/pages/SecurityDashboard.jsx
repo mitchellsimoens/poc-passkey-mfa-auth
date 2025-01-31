@@ -12,9 +12,11 @@ export default function SecurityDashboard() {
     }, [username]);
 
     const fetchSecurityData = async () => {
-        const res = await fetch(`${API_URL}/security?username=${username}`).then(res => res.json());
-        setLogins(res.logins || []);
-        setTrustedDevices(res.trustedDevices || []);
+        const loginsRes = await fetch(`${API_URL}/login-history?username=${username}`).then(res => res.json());
+        const devicesRes = await fetch(`${API_URL}/trusted-devices?username=${username}`).then(res => res.json());
+
+        setLogins(loginsRes || []);
+        setTrustedDevices(devicesRes || []);
     };
 
     const removeTrustedDevice = async (deviceId) => {
@@ -31,13 +33,45 @@ export default function SecurityDashboard() {
         <div>
             <h2>Security Dashboard</h2>
             <input type="text" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+            <button onClick={fetchSecurityData}>Fetch Security Data</button>
+
             <h3>Recent Logins</h3>
-            <ul>{logins.map((log, index) => <li key={index}>{log.device} from {log.ip} at {log.timestamp}</li>)}</ul>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>IP Address</th>
+                        <th>Device</th>
+                        <th>Browser</th>
+                        <th>OS</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {logins.map((log, index) => (
+                        <tr key={index}>
+                            <td>{new Date(log.timestamp).toLocaleString()}</td>
+                            <td>{log.ip}</td>
+                            <td>{log.device}</td>
+                            <td>{log.browser}</td>
+                            <td>{log.os}</td>
+                            <td style={{ color: log.success ? 'green' : 'red' }}>{log.success ? 'Success' : 'Failed'}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+
             <h3>Trusted Devices</h3>
             <ul>
-                {trustedDevices.map((device, index) => (
-                    <li key={index}>{device} <button onClick={() => removeTrustedDevice(device)}>Remove</button></li>
-                ))}
+                {trustedDevices.length === 0 ? (
+                    <li>No trusted devices found</li>
+                ) : (
+                    trustedDevices.map((device, index) => (
+                        <li key={index}>
+                            {device} <button onClick={() => removeTrustedDevice(device)}>Remove</button>
+                        </li>
+                    ))
+                )}
             </ul>
         </div>
     );

@@ -31,9 +31,21 @@ const transporter = nodemailer.createTransport({
 });
 
 // **Track Login Attempts & Alert User on New Device**
-async function trackLogin(username, ip, userAgent, success) {
-    const attempt = { username, ip, userAgent, success, timestamp: new Date() };
-    await loginAttempts.insertOne(attempt);
+async function trackLogin(username, req, success) {
+    const ip = req.headers['x-forwarded-for'] || req.ip;
+    const userAgent = useragent.parse(req.headers['user-agent']);
+
+    const loginRecord = {
+        username,
+        ip,
+        device: userAgent.device.toString() || 'Unknown Device',
+        browser: userAgent.toAgent(),
+        os: userAgent.os.toString(),
+        success,
+        timestamp: new Date()
+    };
+
+    await loginAttempts.insertOne(loginRecord);
 
     if (success) {
         const user = await users.findOne({ username });
@@ -42,7 +54,7 @@ async function trackLogin(username, ip, userAgent, success) {
                 from: process.env.EMAIL_USER,
                 to: user.email,
                 subject: 'New Login Detected',
-                text: `A new login was detected:\n\n- IP: ${ip}\n- Device: ${userAgent}\n- Time: ${new Date().toLocaleString()}\n\nIf this was not you, please secure your account.`
+                text: `A new login was detected:\n\n- IP: ${ip}\n- Device: ${loginRecord.device}\n- Browser: ${loginRecord.browser}\n- OS: ${loginRecord.os}\n- Time: ${new Date().toLocaleString()}\n\nIf this was not you, please secure your account.`
             });
         }
     }
