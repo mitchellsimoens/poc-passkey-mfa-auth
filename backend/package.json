@@ -4,8 +4,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "bun run server.js",
-    "start": "bun server.js"
+    "dev": "bun run src/server.js",
+    "start": "bun src/server.js"
   },
   "keywords": [],
   "author": "",
