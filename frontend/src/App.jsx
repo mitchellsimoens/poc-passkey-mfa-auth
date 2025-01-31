@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import LogoutButton from './components/LogoutButton';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -7,9 +8,14 @@ import PasskeyManager from './pages/PasskeyManager';
 import OTPSetup from './pages/OTPSetup';
 import SecurityDashboard from './pages/SecurityDashboard';
 import Login from './pages/Login';
+import { startTokenRefreshInterval } from './utils/auth';
 import './App.css';
 
-function App() {
+export default function App() {
+  useEffect(() => {
+    startTokenRefreshInterval(); // Start token refresh when app loads
+  }, []);
+
   return (
     <>
       <nav>
@@ -35,5 +41,3 @@ function App() {
     </>
   );
 }
-
-export default App;
