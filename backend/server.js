@@ -8,6 +8,7 @@ import bcrypt from 'bcrypt';
 import { MongoClient } from 'mongodb';
 import speakeasy from 'speakeasy';
 import nodemailer from 'nodemailer';
+import useragent from 'useragent';
 import { verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 
 const fastify = Fastify({ logger: true });
@@ -136,7 +137,22 @@ fastify.post('/login/verify', async (req, reply) => {
         .send({ success: true });
 });
 
-// **Logout**
+
+// **Trusted Device Management**
+fastify.get('/trusted-devices', async (req, reply) => {
+    const { username } = req.query;
+    const user = await users.findOne({ username });
+
+    reply.send(user.trustedDevices || []);
+});
+
+fastify.post('/remove-trusted-device', async (req, reply) => {
+    const { username, deviceId } = req.body;
+    await users.updateOne({ username }, { $pull: { trustedDevices: deviceId } });
+    reply.send({ success: true });
+});
+
+// **Logout Endpoint**
 fastify.post('/logout', async (req, reply) => {
     reply.clearCookie('token').clearCookie('refreshToken').send({ success: true });
 });
