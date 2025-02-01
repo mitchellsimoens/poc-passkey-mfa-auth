@@ -247,43 +247,53 @@ fastify.post('/login', async (req, reply) => {
 
   await trackLogin(username, req, true);
 
-  const { accessToken, refreshToken } = generateTokens(username);
-  await users.updateOne({ username }, { $set: { refreshToken } });
-
-  reply
-    .setCookie('token', accessToken, { ...baseCookieOptions, maxAge: 900 })
-    .setCookie('refreshToken', refreshToken, { ...baseCookieOptions, maxAge: 604800 })
-    .send({ success: true, options, mfaRequired: user.otpSecret ? true : false });
+  reply.send({ success: true, options, mfaRequired: user.otpSecret ? true : false });
 });
 
 // **Verify Passkey Login & OTP MFA**
 fastify.post('/login/verify', async (req, reply) => {
-  const { username, response, otp, backupCode } = req.body;
+  const { username, password, response, otp, backupCode } = req.body;
   const user = await users.findOne({ username });
-  const credential = user.credentials.find((cred) => cred.id === response.id);
+  const isPasswordValid = password && (await bcrypt.compare(password, user.password));
 
-  const currentOptions = await getWebAuthnOptions(user);
+  // response is present, login is passkey
+  if (response) {
+    // Passkey authentication
+    const credential = user.credentials.find((cred) => cred.id === response.id);
 
-  const verification = await verifyAuthenticationResponse({
-    response,
-    expectedOrigin: frontendUrl,
-    expectedChallenge: currentOptions.challenge,
-    expectedRPID: currentOptions.rp.id,
-    credential: {
-      ...credential,
-      publicKey: Uint8Array.fromBase64(credential.publicKey),
-    },
-  });
+    if (!credential) {
+      return reply.code(400).send({ error: 'Invalid credential' });
+    }
 
-  if (!verification.verified) {
-    return reply.code(400).send({ error: 'Authentication failed' });
+    const currentOptions = await getWebAuthnOptions(user);
+
+    const verification = await verifyAuthenticationResponse({
+      response,
+      expectedOrigin: frontendUrl,
+      expectedChallenge: currentOptions.challenge,
+      expectedRPID: new URL(frontendUrl).hostname,
+      credential: {
+        ...credential,
+        publicKey: Uint8Array.fromBase64(credential.publicKey),
+      },
+    });
+
+    if (!verification.verified) {
+      return reply.code(400).send({ error: 'Authentication failed' });
+    }
+
+    credential.counter = verification.authenticationInfo.newCounter;
+
+    await users.updateOne({ username }, { $set: { credentials: user.credentials } });
   }
+  // no passkey but has otp and use is setup for otp
+  // password still needs to be valid
+  else if (otp && user.otpSecret) {
+    if (!isPasswordValid) {
+      return reply.code(400).send({ error: 'Invalid credentials' });
+    }
 
-  credential.counter = verification.authenticationInfo.newCounter;
-
-  await users.updateOne({ username }, { $set: { credentials: user.credentials } });
-
-  if (user.otpSecret) {
+    // Traditional MFA/OTP authentication
     const isOtpValid = speakeasy.totp.verify({
       secret: user.otpSecret,
       encoding: 'base32',
@@ -299,6 +309,10 @@ fastify.post('/login/verify', async (req, reply) => {
     if (isBackupCodeValid) {
       await users.updateOne({ username }, { $pull: { backupCodes: backupCode } });
     }
+  }
+  // no passkey or otp, just username/password
+  else if (!isPasswordValid) {
+    return reply.code(400).send({ error: 'Invalid credentials' });
   }
 
   await trackLogin(username, req, true);
@@ -353,21 +367,49 @@ fastify.post('/enable-mfa', async (req, reply) => {
     return reply.code(400).send({ error: 'User not found' });
   }
 
-  const secret = speakeasy.generateSecret({ length: 20 });
-  const otpAuthUrl = speakeasy.otpauthURL({
-    secret: secret.base32,
-    label: `YourAppName (${username})`,
+  const secret = speakeasy.generateSecret({
     issuer: 'YourAppName',
   });
 
-  await users.updateOne({ username }, { $set: { otpSecret: secret.base32 } });
+  await users.updateOne({ username }, { $set: { otpTempSecret: secret.base32 } });
 
-  const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
+  const qrCodeDataUrl = await QRCode.toDataURL(secret.otpauth_url);
 
   reply.send({
     secret: secret.base32,
     qrCode: qrCodeDataUrl,
   });
+});
+
+// **Verify MFA Code**
+fastify.post('/verify-mfa', async (req, reply) => {
+  const { username, token } = req.body;
+  const user = await users.findOne({ username });
+
+  if (!user || !user.otpTempSecret) {
+    return reply.code(400).send({ error: 'MFA not enabled for this user' });
+  }
+
+  const isValid = speakeasy.totp.verify({
+    secret: user.otpTempSecret,
+    encoding: 'base32',
+    token: token,
+    window: 6,
+  });
+
+  if (!isValid) {
+    return reply.code(400).send({ error: 'Invalid OTP code' });
+  }
+
+  await users.updateOne(
+    { username },
+    {
+      $set: { otpSecret: user.otpTempSecret, otpEnabled: true },
+      $unset: { otpTempSecret: '' },
+    },
+  );
+
+  reply.send({ success: true });
 });
 
 // **Login History Endpoint**
@@ -398,7 +440,7 @@ fastify.post('/remove-trusted-device', async (req, reply) => {
 });
 
 // **Logout Endpoint**
-fastify.post('/logout', async (req, reply) => {
+fastify.post('/logout', async (_, reply) => {
   reply.clearCookie('token').clearCookie('refreshToken').send({ success: true });
 });
 

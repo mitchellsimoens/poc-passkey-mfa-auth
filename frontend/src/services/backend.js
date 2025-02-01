@@ -19,15 +19,16 @@ export class BackendService {
   async #doFetch(method, endpoint, body) {
     try {
       const url = new URL(endpoint, BASE_URL);
+      const headers = {};
       const options = {
+        headers,
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
         credentials: 'include', // Include cookies if needed
       };
 
       if (body) {
+        headers['Content-Type'] = 'application/json';
+
         switch (method) {
           case 'POST':
             options.body = JSON.stringify(body);

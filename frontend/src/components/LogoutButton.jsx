@@ -5,9 +5,12 @@ export default function LogoutButton() {
   const navigate = useNavigate();
 
   const logout = async () => {
-    await service.post('/logout');
-
-    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    try {
+      await service.post('/logout');
+    } catch {
+      // Fallback: manually clear the cookie if server request fails
+      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    }
 
     navigate('/');
   };
