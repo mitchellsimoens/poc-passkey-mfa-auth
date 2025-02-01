@@ -11,17 +11,22 @@ export default function Login() {
   const login = async () => {
     const { options } = await fetch(`${API_URL}/login`, {
       method: 'POST',
+      credentials: 'include',
       body: JSON.stringify({ username, password }),
       headers: { 'Content-Type': 'application/json' },
     }).then((res) => res.json());
 
-    const response = await startAuthentication(options);
+    if (options) {
+      const response = await startAuthentication(options);
 
-    await fetch(`${API_URL}/login/verify`, {
-      method: 'POST',
-      body: JSON.stringify({ username, response, otp }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+      // TODO: check if this was successful and if not, fail login
+      await fetch(`${API_URL}/login/verify`, {
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ username, response, otp }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     alert('Login successful');
   };

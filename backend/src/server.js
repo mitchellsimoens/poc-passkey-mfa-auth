@@ -5,19 +5,30 @@ import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import {
   generateAuthenticationOptions,
+  generateRegistrationOptions,
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
+import { isoUint8Array } from '@simplewebauthn/server/helpers';
 import bcrypt from 'bcrypt';
 import Fastify from 'fastify';
 import { MongoClient } from 'mongodb';
 import nodemailer from 'nodemailer';
 import speakeasy from 'speakeasy';
 import useragent from 'useragent';
+import QRCode from 'qrcode';
 
 const fastify = Fastify({ logger: true });
+const frontendUrl = 'http://localhost:5173';
+const baseCookieOptions = {
+  secure: new URL(frontendUrl).protocol === 'https:',
+  sameSite: 'Lax', // Changed from Strict for development
+  path: '/', // Add explicit path
+  domain: process.env.COOKIE_DOMAIN || new URL(frontendUrl).hostname,
+  maxAge: 900,
+};
 
-fastify.register(cors, { origin: 'https://your-frontend-domain.com', credentials: true });
+fastify.register(cors, { origin: frontendUrl, credentials: true });
 fastify.register(helmet);
 fastify.register(cookie);
 fastify.register(jwt, { secret: process.env.JWT_SECRET || 'your-secret-key' });
@@ -39,6 +50,30 @@ const generateTokens = (username) => ({
   refreshToken: fastify.jwt.sign({ username }, { expiresIn: '7d' }),
 });
 
+const generateChallengeForUser = (user) => isoUint8Array.fromUTF8String(user._id.toString() + user.username);
+
+const getWebAuthnOptions = async (user) => {
+  const options = await generateRegistrationOptions({
+    rpID: new URL(frontendUrl).hostname,
+    rpName: 'ACME Corporation', // TODO: via config/env var
+    userID: isoUint8Array.fromUTF8String(user._id.toString()),
+    attestationType: 'none',
+    userName: user.username,
+    authenticatorSelection: {
+      authenticatorAttachment: 'platform',
+    },
+    challenge: generateChallengeForUser(user),
+    // TODO: load current passkeys
+    // excludeCredentials: userPasskeys.map(passkey => ({
+    //   id: passkey.id,
+    //   // Optional
+    //   transports: passkey.transports,
+    // })),
+  });
+
+  return options;
+};
+
 // **Track Login Attempts & Alert User on New Device**
 async function trackLogin(username, req, success) {
   const ip = req.headers['x-forwarded-for'] || req.ip;
@@ -56,8 +91,9 @@ async function trackLogin(username, req, success) {
 
   await loginAttempts.insertOne(loginRecord);
 
-  if (success) {
+  if (process.env.EMAIL_USER && success) {
     const user = await users.findOne({ username });
+
     if (user?.email) {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
@@ -69,6 +105,42 @@ async function trackLogin(username, req, success) {
   }
 }
 
+// **Register a User with Username & Password**
+fastify.post('/register', async (req, reply) => {
+  const { username, password } = req.body;
+  const userExists = await users.findOne({ username });
+
+  if (userExists) {
+    return reply.code(400).send({ error: 'User already exists' });
+  }
+
+  const saltRounds = 10;
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+  await users.insertOne({ username, password: hashedPassword });
+
+  reply.send({ success: true });
+});
+
+// **Get Passkey Registration Options**
+fastify.get('/register-passkey/options', async (req, reply) => {
+  const { username } = req.query;
+
+  if (!username) {
+    return reply.code(400).send({ error: 'Username is required' });
+  }
+
+  const user = await users.findOne({ username });
+
+  if (!user) {
+    return reply.code(404).send({ error: 'User not found' });
+  }
+
+  const options = await getWebAuthnOptions(user);
+
+  reply.send(options);
+});
+
 // **Register a Passkey with a Creation Date**
 fastify.post('/register-passkey', async (req, reply) => {
   const { username, passkeyName, response } = req.body;
@@ -78,23 +150,46 @@ fastify.post('/register-passkey', async (req, reply) => {
     return reply.code(400).send({ error: 'User not found' });
   }
 
+  const currentOptions = await getWebAuthnOptions(user);
+
   const verification = await verifyRegistrationResponse({
     response,
-    expectedOrigin: 'https://your-frontend-domain.com',
+    expectedOrigin: frontendUrl,
+    expectedChallenge: currentOptions.challenge,
+    expectedRPID: currentOptions.rp.id,
   });
 
   if (!verification.verified) {
     return reply.code(400).send({ error: 'Passkey registration failed' });
   }
 
-  const passkey = {
-    id: verification.registrationInfo.credentialID,
+  const { registrationInfo } = verification;
+  const {
+    credential,
+    credentialDeviceType,
+    credentialBackedUp,
+  } = registrationInfo;
+  const newPasskey = {
+    // Created by `generateRegistrationOptions()` in Step 1
+    webAuthnUserID: currentOptions.user.id,
+    // A unique identifier for the credential
+    id: credential.id,
+    // The public key bytes, used for subsequent authentication signature verification
+    publicKey: credential.publicKey.toBase64(),
+    // The number of times the authenticator has been used on this site so far
+    counter: credential.counter,
+    // How the browser can talk with this credential's authenticator
+    transports: credential.transports,
+    // Whether the passkey is single-device or multi-device
+    deviceType: credentialDeviceType,
+    // Whether the passkey has been backed up in some way
+    backedUp: credentialBackedUp,
+    // app values
     name: passkeyName,
-    publicKey: verification.registrationInfo.publicKey,
     createdAt: new Date(),
   };
 
-  await users.updateOne({ username }, { $push: { credentials: passkey } });
+  await users.updateOne({ username }, { $push: { credentials: newPasskey } });
 
   reply.send({ success: true });
 });
@@ -102,8 +197,29 @@ fastify.post('/register-passkey', async (req, reply) => {
 // **Remove a Specific Passkey**
 fastify.post('/remove-passkey', async (req, reply) => {
   const { username, credentialId } = req.body;
+
   await users.updateOne({ username }, { $pull: { credentials: { id: credentialId } } });
+
   reply.send({ success: true });
+});
+
+// **Get List of Passkeys**
+fastify.get('/passkeys', async (req, reply) => {
+  const { username } = req.query;
+
+  if (!username) {
+    return reply.code(400).send({ error: 'Username is required' });
+  }
+
+  const user = await users.findOne({ username });
+
+  if (!user) {
+    return reply.code(404).send({ error: 'User not found' });
+  }
+
+  const credentials = user.credentials?.map(({ response: _response, ...rest }) => rest) ?? [];
+
+  reply.send(credentials);
 });
 
 // **Login with Password**
@@ -115,27 +231,58 @@ fastify.post('/login', async (req, reply) => {
     return reply.code(400).send({ error: 'Invalid credentials' });
   }
 
-  const options = generateAuthenticationOptions({
-    rpID: 'your-frontend-domain.com',
-    allowCredentials: user.credentials,
-  });
+  const challenge = generateChallengeForUser(user);
+  const currentOptions = await getWebAuthnOptions(user);
 
-  reply.send({ options, mfaRequired: user.otpSecret ? true : false });
+  const options = user.credentials?.length > 0
+    // has passkeys, generate authentication options
+    ? await generateAuthenticationOptions({
+      rpID: currentOptions.rp.id,
+      allowCredentials: user.credentials.map(({ id }) => ({ id })),
+      challenge,
+    })
+    : null;
+
+  await trackLogin(username, req, true);
+
+  const { accessToken, refreshToken } = generateTokens(username);
+  await users.updateOne({ username }, { $set: { refreshToken } });
+
+  reply
+    .setCookie('token', accessToken, { ...baseCookieOptions, maxAge: 900 })
+    .setCookie('refreshToken', refreshToken, { ...baseCookieOptions, maxAge: 604800 })
+    .send({ success: true, options, mfaRequired: user.otpSecret ? true : false });
 });
 
 // **Verify Passkey Login & OTP MFA**
 fastify.post('/login/verify', async (req, reply) => {
   const { username, response, otp, backupCode } = req.body;
   const user = await users.findOne({ username });
+  const credential = user.credentials.find((cred) => cred.id === response.id);
+
+  const currentOptions = await getWebAuthnOptions(user);
 
   const verification = await verifyAuthenticationResponse({
     response,
-    expectedOrigin: 'https://your-frontend-domain.com',
+    expectedOrigin: frontendUrl,
+    expectedChallenge: currentOptions.challenge,
+    expectedRPID: currentOptions.rp.id,
+    credential: {
+      ...credential,
+      publicKey: Uint8Array.fromBase64(credential.publicKey),
+    },
   });
 
   if (!verification.verified) {
     return reply.code(400).send({ error: 'Authentication failed' });
   }
+
+  credential.counter = verification.authenticationInfo.newCounter;
+
+  await users.updateOne(
+    { username },
+    { $set: { credentials: user.credentials } }
+  );
 
   if (user.otpSecret) {
     const isOtpValid = speakeasy.totp.verify({
@@ -155,14 +302,14 @@ fastify.post('/login/verify', async (req, reply) => {
     }
   }
 
-  await trackLogin(username, req.ip, req.headers['user-agent'], true);
+  await trackLogin(username, req, true);
 
   const { accessToken, refreshToken } = generateTokens(username);
   await users.updateOne({ username }, { $set: { refreshToken } });
 
   reply
-    .setCookie('token', accessToken, { httpOnly: true, secure: true, sameSite: 'Strict', maxAge: 900 })
-    .setCookie('refreshToken', refreshToken, { httpOnly: true, secure: true, sameSite: 'Strict', maxAge: 604800 })
+    .setCookie('token', accessToken, { ...baseCookieOptions, maxAge: 900 })
+    .setCookie('refreshToken', refreshToken, { ...baseCookieOptions, maxAge: 604800 })
     .send({ success: true });
 });
 
@@ -198,6 +345,45 @@ fastify.post('/refresh-token', async (req, reply) => {
   }
 });
 
+// **Enable MFA Endpoint**
+fastify.post('/enable-mfa', async (req, reply) => {
+  const { username } = req.body;
+  const user = await users.findOne({ username });
+
+  if (!user) {
+    return reply.code(400).send({ error: 'User not found' });
+  }
+
+  const secret = speakeasy.generateSecret({ length: 20 });
+  const otpAuthUrl = speakeasy.otpauthURL({
+    secret: secret.base32,
+    label: `YourAppName (${username})`,
+    issuer: 'YourAppName',
+  });
+
+  await users.updateOne({ username }, { $set: { otpSecret: secret.base32 } });
+
+  const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
+
+  reply.send({
+    secret: secret.base32,
+    qrCode: qrCodeDataUrl,
+  });
+});
+
+// **Login History Endpoint**
+fastify.get('/login-history', async (req, reply) => {
+  const { username } = req.query;
+
+  if (!username) {
+    return reply.code(400).send({ error: 'Username is required' });
+  }
+
+  const history = await loginAttempts.find({ username }).toArray();
+
+  reply.send(history);
+});
+
 // **Trusted Device Management**
 fastify.get('/trusted-devices', async (req, reply) => {
   const { username } = req.query;
@@ -217,4 +403,4 @@ fastify.post('/logout', async (req, reply) => {
   reply.clearCookie('token').clearCookie('refreshToken').send({ success: true });
 });
 
-fastify.listen({ port: 3000 }, () => console.log('Server running on https://localhost:3000'));
+fastify.listen({ port: 3000 }, () => console.log('Server running on http://localhost:3000'));

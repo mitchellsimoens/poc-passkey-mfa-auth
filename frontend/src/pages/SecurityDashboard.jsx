@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
+import { decodeToken } from '../utils/auth';
 
 const API_URL = 'http://localhost:3000';
 
 export default function SecurityDashboard() {
-  const [username, setUsername] = useState('');
   const [logins, setLogins] = useState([]);
   const [trustedDevices, setTrustedDevices] = useState([]);
+  const username = decodeToken().username;
 
   const fetchSecurityData = useCallback(async () => {
-    const loginsRes = await fetch(`${API_URL}/login-history?username=${username}`).then((res) => res.json());
-    const devicesRes = await fetch(`${API_URL}/trusted-devices?username=${username}`).then((res) => res.json());
+    const loginsRes = await fetch(`${API_URL}/login-history?username=${username}`, { credentials: 'include' }).then(
+      (res) => res.json(),
+    );
+    const devicesRes = await fetch(`${API_URL}/trusted-devices?username=${username}`, { credentials: 'include' }).then(
+      (res) => res.json(),
+    );
 
     setLogins(loginsRes || []);
     setTrustedDevices(devicesRes || []);
@@ -22,6 +27,7 @@ export default function SecurityDashboard() {
   const removeTrustedDevice = async (deviceId) => {
     await fetch(`${API_URL}/remove-trusted-device`, {
       method: 'POST',
+      credentials: 'include',
       body: JSON.stringify({ username, deviceId }),
       headers: { 'Content-Type': 'application/json' },
     });
@@ -32,7 +38,6 @@ export default function SecurityDashboard() {
   return (
     <div>
       <h2>Security Dashboard</h2>
-      <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
       <button onClick={fetchSecurityData}>Fetch Security Data</button>
 
       <h3>Recent Logins</h3>

@@ -1,3 +1,5 @@
+import { jwtDecode } from 'jwt-decode';
+
 const API_URL = 'http://localhost:3000';
 
 // Function to refresh the access token
@@ -27,4 +29,14 @@ export const startTokenRefreshInterval = () => {
     },
     14 * 60 * 1000,
   ); // Refresh every 14 minutes
+};
+
+export const decodeToken = () => {
+  const token = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith('token='))
+    .split('=')[1];
+  const decoded = jwtDecode(token);
+
+  return decoded;
 };

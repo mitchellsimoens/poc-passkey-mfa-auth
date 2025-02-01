@@ -1,24 +1,26 @@
 import { useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
+import { decodeToken } from '../utils/auth';
 
 const API_URL = 'http://localhost:3000';
 
 export default function PasskeySetup() {
-  const [username, setUsername] = useState('');
   const [passkeyName, setPasskeyName] = useState('');
   const [message, setMessage] = useState('');
 
   const registerPasskey = async () => {
-    const options = await fetch(`${API_URL}/register-passkey`, {
-      method: 'POST',
-      body: JSON.stringify({ username, passkeyName }),
+    const username = decodeToken().username;
+    const options = await fetch(`${API_URL}/register-passkey/options?username=${username}`, {
+      method: 'GET',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
     }).then((res) => res.json());
 
-    const response = await startRegistration(options);
+    const response = await startRegistration({ optionsJSON: options });
 
     const res = await fetch(`${API_URL}/register-passkey`, {
       method: 'POST',
+      credentials: 'include',
       body: JSON.stringify({ username, response, passkeyName }),
       headers: { 'Content-Type': 'application/json' },
     }).then((res) => res.json());
@@ -33,7 +35,6 @@ export default function PasskeySetup() {
   return (
     <div>
       <h2>Setup Passkey</h2>
-      <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
       <input
         type="text"
         placeholder="Passkey Name (e.g., Work Laptop)"

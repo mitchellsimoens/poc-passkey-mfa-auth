@@ -1,23 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
+import { decodeToken } from '../utils/auth';
 
 const API_URL = 'http://localhost:3000';
 
 export default function PasskeyManager() {
-  const [username, setUsername] = useState('');
   const [passkeys, setPasskeys] = useState([]);
 
   const fetchPasskeys = useCallback(async () => {
-    const res = await fetch(`${API_URL}/passkeys?username=${username}`).then((res) => res.json());
-    setPasskeys(res.passkeys || []);
-  }, [username]);
+    const username = decodeToken().username;
+    const res = await fetch(`${API_URL}/passkeys?username=${username}`, { credentials: 'include' }).then((res) =>
+      res.json(),
+    );
+
+    setPasskeys(res || []);
+  }, []);
 
   useEffect(() => {
-    if (username) fetchPasskeys();
-  }, [fetchPasskeys, username]);
+    fetchPasskeys();
+  }, [fetchPasskeys]);
 
   const removePasskey = async (credentialId) => {
+    const username = decodeToken().username;
+
     await fetch(`${API_URL}/remove-passkey`, {
       method: 'POST',
+      credentials: 'include',
       body: JSON.stringify({ username, credentialId }),
       headers: { 'Content-Type': 'application/json' },
     });
@@ -28,11 +35,11 @@ export default function PasskeyManager() {
   return (
     <div>
       <h2>Manage Passkeys</h2>
-      <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
       <ul>
-        {passkeys.map((key, index) => (
-          <li key={index}>
-            {key.name || 'Unnamed'} ({key.id}) <button onClick={() => removePasskey(key.id)}>Remove</button>
+        {passkeys.map((key) => (
+          <li key={key.id}>
+            {key.name || '<Unnamed>'} ({key.id}) Created: {key.createdAt}{' '}
+            <button onClick={() => removePasskey(key.id)}>Remove</button>
           </li>
         ))}
       </ul>
