@@ -164,11 +164,7 @@ fastify.post('/register-passkey', async (req, reply) => {
   }
 
   const { registrationInfo } = verification;
-  const {
-    credential,
-    credentialDeviceType,
-    credentialBackedUp,
-  } = registrationInfo;
+  const { credential, credentialDeviceType, credentialBackedUp } = registrationInfo;
   const newPasskey = {
     // Created by `generateRegistrationOptions()` in Step 1
     webAuthnUserID: currentOptions.user.id,
@@ -217,7 +213,12 @@ fastify.get('/passkeys', async (req, reply) => {
     return reply.code(404).send({ error: 'User not found' });
   }
 
-  const credentials = user.credentials?.map(({ response: _response, ...rest }) => rest) ?? [];
+  const credentials =
+    user.credentials?.map((credential) => ({
+      id: credential.id,
+      createdAt: credential.createdAt,
+      name: credential.name || '<Unnamed>',
+    })) ?? [];
 
   reply.send(credentials);
 });
@@ -234,14 +235,15 @@ fastify.post('/login', async (req, reply) => {
   const challenge = generateChallengeForUser(user);
   const currentOptions = await getWebAuthnOptions(user);
 
-  const options = user.credentials?.length > 0
-    // has passkeys, generate authentication options
-    ? await generateAuthenticationOptions({
-      rpID: currentOptions.rp.id,
-      allowCredentials: user.credentials.map(({ id }) => ({ id })),
-      challenge,
-    })
-    : null;
+  const options =
+    user.credentials?.length > 0
+      ? // has passkeys, generate authentication options
+        await generateAuthenticationOptions({
+          rpID: currentOptions.rp.id,
+          allowCredentials: user.credentials.map(({ id }) => ({ id })),
+          challenge,
+        })
+      : null;
 
   await trackLogin(username, req, true);
 
@@ -279,10 +281,7 @@ fastify.post('/login/verify', async (req, reply) => {
 
   credential.counter = verification.authenticationInfo.newCounter;
 
-  await users.updateOne(
-    { username },
-    { $set: { credentials: user.credentials } }
-  );
+  await users.updateOne({ username }, { $set: { credentials: user.credentials } });
 
   if (user.otpSecret) {
     const isOtpValid = speakeasy.totp.verify({

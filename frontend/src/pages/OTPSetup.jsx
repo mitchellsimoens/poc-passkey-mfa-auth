@@ -1,35 +1,26 @@
 import { useState } from 'react';
+import service from '../services/backend';
 import { decodeToken } from '../utils/auth';
-
-const API_URL = 'http://localhost:3000';
 
 export default function OTPSetup() {
   const [qrCode, setQrCode] = useState('');
   const [otp, setOtp] = useState('');
-  const [message, setMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const enableMFA = async () => {
     const username = decodeToken().username;
-    const res = await fetch(`${API_URL}/enable-mfa`, {
-      method: 'POST',
-      credentials: 'include',
-      body: JSON.stringify({ username }),
-      headers: { 'Content-Type': 'application/json' },
-    }).then((res) => res.json());
+    const res = await service.post('/enable-mfa', { username });
 
     setQrCode(res.qrCode);
+
+    // TODO: handle success somehow
   };
 
   const verifyOTP = async () => {
     const username = decodeToken().username;
-    const res = await fetch(`${API_URL}/verify-mfa`, {
-      method: 'POST',
-      credentials: 'include',
-      body: JSON.stringify({ username, token: otp }),
-      headers: { 'Content-Type': 'application/json' },
-    }).then((res) => res.json());
+    const res = await service.post('/verify-mfa', { username, token: otp });
 
-    setMessage(res.success ? 'MFA enabled!' : 'Invalid OTP.');
+    setErrorMessage(res.success ? 'MFA enabled!' : 'Invalid OTP.');
   };
 
   return (
@@ -39,7 +30,7 @@ export default function OTPSetup() {
       {qrCode && <img src={qrCode} alt="Scan QR Code" />}
       <input type="text" placeholder="Enter OTP" value={otp} onChange={(e) => setOtp(e.target.value)} />
       <button onClick={verifyOTP}>Verify</button>
-      <p>{message}</p>
+      {errorMessage && <div>{errorMessage}</div>}
     </div>
   );
 }

@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = 'http://localhost:3000';
+import service from '../services/backend';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -19,32 +18,12 @@ export default function Login() {
 
   const login = async () => {
     try {
-      const loginResponse = await fetch(`${API_URL}/login`, {
-        method: 'POST',
-        credentials: 'include',
-        body: JSON.stringify({ username, password, otp }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!loginResponse.ok) {
-        throw new Error('Verification failed');
-      }
-
-      const { options } = await loginResponse.json();
+      const { options } = await service.post('/login', { username, password, otp });
 
       if (options) {
         const response = await startAuthentication(options);
 
-        const verifyResponse = await fetch(`${API_URL}/login/verify`, {
-          method: 'POST',
-          credentials: 'include',
-          body: JSON.stringify({ username, response, otp }),
-          headers: { 'Content-Type': 'application/json' },
-        });
-
-        if (!verifyResponse.ok) {
-          throw new Error('Verification failed');
-        }
+        await service.post('/login/verify', { username, response, otp });
 
         handleSuccess();
       } else {

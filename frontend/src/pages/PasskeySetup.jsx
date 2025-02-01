@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
+import service from '../services/backend';
 import { decodeToken } from '../utils/auth';
-
-const API_URL = 'http://localhost:3000';
 
 export default function PasskeySetup() {
   const [passkeyName, setPasskeyName] = useState('');
@@ -10,20 +9,11 @@ export default function PasskeySetup() {
 
   const registerPasskey = async () => {
     const username = decodeToken().username;
-    const options = await fetch(`${API_URL}/register-passkey/options?username=${username}`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    }).then((res) => res.json());
+    const options = await service.get('/register-passkey/options', { username });
 
     const response = await startRegistration({ optionsJSON: options });
 
-    const res = await fetch(`${API_URL}/register-passkey`, {
-      method: 'POST',
-      credentials: 'include',
-      body: JSON.stringify({ username, response, passkeyName }),
-      headers: { 'Content-Type': 'application/json' },
-    }).then((res) => res.json());
+    const res = await service.post('/register-passkey', { username, response, passkeyName });
 
     if (res.success) {
       setMessage('Passkey registered successfully!');

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import service from '../services/backend';
 import { decodeToken } from '../utils/auth';
-
-const API_URL = 'http://localhost:3000';
 
 export default function SecurityDashboard() {
   const [logins, setLogins] = useState([]);
@@ -9,12 +8,8 @@ export default function SecurityDashboard() {
   const username = decodeToken().username;
 
   const fetchSecurityData = useCallback(async () => {
-    const loginsRes = await fetch(`${API_URL}/login-history?username=${username}`, { credentials: 'include' }).then(
-      (res) => res.json(),
-    );
-    const devicesRes = await fetch(`${API_URL}/trusted-devices?username=${username}`, { credentials: 'include' }).then(
-      (res) => res.json(),
-    );
+    const loginsRes = await service.get('/login-history', { username });
+    const devicesRes = await service.get('/trusted-devices', { username });
 
     setLogins(loginsRes || []);
     setTrustedDevices(devicesRes || []);
@@ -25,12 +20,7 @@ export default function SecurityDashboard() {
   }, [username, fetchSecurityData]);
 
   const removeTrustedDevice = async (deviceId) => {
-    await fetch(`${API_URL}/remove-trusted-device`, {
-      method: 'POST',
-      credentials: 'include',
-      body: JSON.stringify({ username, deviceId }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    await service.post('/remove-trusted-device', { username, deviceId });
 
     fetchSecurityData();
   };

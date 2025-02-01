@@ -1,6 +1,5 @@
 import { useState } from 'react';
-
-const API_URL = 'http://localhost:3000';
+import service from '../services/backend';
 
 export default function Register() {
   const [username, setUsername] = useState('');
@@ -8,12 +7,7 @@ export default function Register() {
   const [message, setMessage] = useState('');
 
   const register = async () => {
-    const res = await fetch(`${API_URL}/register`, {
-      method: 'POST',
-      credentials: 'include',
-      body: JSON.stringify({ username, password }),
-      headers: { 'Content-Type': 'application/json' },
-    }).then((res) => res.json());
+    const res = await service.post('/register', { username, password });
 
     if (res.success) {
       setMessage('Registration successful! Now register a passkey.');
