@@ -12,6 +12,7 @@ import { loginHistory } from './routes/login/history';
 import { logout } from './routes/login/logout';
 import { loginSecondStep } from './routes/login/second-step';
 import { refreshTokens } from './routes/login/refresh-tokens';
+import { disableMfa } from './routes/mfa/disable';
 import { enableMfa } from './routes/mfa/enable';
 import { verifyMfa } from './routes/mfa/verify';
 import { getPasskeys } from './routes/passkey/get';
@@ -60,6 +61,9 @@ await Promise.all([
 
   // **Enable MFA Endpoint**
   enableMfa(fastify),
+
+  // **Disable MFA Endpoint**
+  disableMfa(fastify),
 
   // **Verify MFA Code**
   verifyMfa(fastify),
