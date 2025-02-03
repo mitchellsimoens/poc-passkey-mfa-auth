@@ -92,6 +92,7 @@ export const loginSecondStep = async (fastify) => {
     await trackLogin(username, req, true);
 
     const { accessToken, refreshToken } = generateTokens(username);
+
     await users.updateOne({ username }, { $set: { refreshToken } });
 
     reply

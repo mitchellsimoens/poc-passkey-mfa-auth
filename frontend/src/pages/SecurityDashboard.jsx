@@ -12,6 +12,7 @@ export default function SecurityDashboard() {
     const devicesRes = await service.get('/trusted-devices', { username });
 
     setLogins(loginsRes || []);
+
     setTrustedDevices(devicesRes || []);
   }, [username]);
 

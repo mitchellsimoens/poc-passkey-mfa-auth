@@ -11,12 +11,15 @@ export const refreshAccessToken = async () => {
     });
 
     const data = await res.json();
+
     if (!data.success) {
       console.warn('Session expired, please log in again.');
+
       window.location.href = '/login'; // Redirect user to login
     }
   } catch (error) {
     console.error('Error refreshing token:', error);
+
     window.location.href = '/login'; // Redirect to login on failure
   }
 };

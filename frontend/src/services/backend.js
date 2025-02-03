@@ -3,6 +3,7 @@ const BASE_URL = 'http://localhost:3000'; // Adjust this to your backend URL
 export class BackendError {
   constructor(message, status) {
     this.message = message;
+
     this.status = status;
   }
 }

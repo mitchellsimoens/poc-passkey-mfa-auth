@@ -25,6 +25,7 @@ export async function trackLogin(username, req, success) {
   };
 
   const loginAttempts = await getCollection('loginAttempts');
+
   await loginAttempts.insertOne(loginRecord);
 
   if (process.env.EMAIL_USER && success) {

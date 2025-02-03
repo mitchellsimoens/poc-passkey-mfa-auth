@@ -19,6 +19,7 @@ export default [
   eslintPluginPrettierRecommended,
   { languageOptions: { globals: globals.node } },
   {
+    files: ['**/*.{js,jsx}'],
     rules: {
       'prettier/prettier': ['error', { singleQuote: true }],
       '@stylistic/lines-between-class-members': [
@@ -32,6 +33,12 @@ export default [
             },
           ],
         },
+      ],
+      'padding-line-between-statements': [
+        'error',
+        { blankLine: 'always', prev: ['var', 'const', 'let'], next: ['return', 'block', 'block-like', 'expression'] },
+        { blankLine: 'always', prev: ['block', 'block-like'], next: 'return' },
+        { blankLine: 'always', prev: '*', next: 'expression' },
       ],
       'no-unused-vars': [
         'error',
@@ -52,7 +59,7 @@ export default [
     },
   },
   {
-    files: ['**/*.{js,jsx}'],
+    files: ['**/*.jsx', 'frontend/src/**/*.js'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,

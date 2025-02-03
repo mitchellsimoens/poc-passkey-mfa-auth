@@ -24,9 +24,13 @@ const fastify = Fastify({ logger: true });
 const frontendUrl = 'http://localhost:5173';
 
 fastify.register(cors, { origin: frontendUrl, credentials: true });
+
 fastify.register(helmet);
+
 fastify.register(cookie);
+
 fastify.register(jwt, { secret: process.env.JWT_SECRET || 'your-secret-key' });
+
 fastify.register(rateLimit, { max: 100, timeWindow: '10 minutes' });
 
 await Promise.all([
