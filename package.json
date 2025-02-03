@@ -5,6 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "docker": "docker compose up -d",
     "lint": "eslint ."
   },
   "repository": {

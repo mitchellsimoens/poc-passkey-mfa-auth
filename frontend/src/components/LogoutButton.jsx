@@ -15,5 +15,5 @@ export default function LogoutButton() {
     navigate('/');
   };
 
-  return <button onClick={logout}>Logout</button>;
+  return <div onClick={logout}>Logout</div>;
 }

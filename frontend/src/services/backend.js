@@ -61,5 +61,3 @@ export class BackendService {
     }
   }
 }
-
-export default new BackendService();

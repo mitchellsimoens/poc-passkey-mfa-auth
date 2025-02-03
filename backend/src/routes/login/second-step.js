@@ -26,14 +26,14 @@ export const loginSecondStep = async (fastify) => {
   const generateTokens = generateTokensFn(fastify);
 
   fastify.post('/login/verify', async (req, reply) => {
-    const { username, password, response, otp, backupCode } = req.body;
+    const { username, password, passkey, otp, backupCode } = req.body;
     const user = await users.findOne({ username });
     const isPasswordValid = password && (await bcrypt.compare(password, user.password));
 
     // response is present, login is passkey
-    if (response) {
+    if (passkey) {
       // Passkey authentication
-      const credential = user.credentials.find((cred) => cred.id === response.id);
+      const credential = user.credentials.find((cred) => cred.id === passkey.id);
 
       if (!credential) {
         return reply.code(400).send({ error: 'Invalid credential' });
@@ -42,7 +42,7 @@ export const loginSecondStep = async (fastify) => {
       const currentOptions = await getWebAuthnOptions(user);
 
       const verification = await verifyAuthenticationResponse({
-        response,
+        passkey,
         expectedOrigin: frontendUrl,
         expectedChallenge: currentOptions.challenge,
         expectedRPID: new URL(frontendUrl).hostname,

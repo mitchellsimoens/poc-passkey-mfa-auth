@@ -1,6 +1,4 @@
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
-import bcrypt from 'bcrypt';
-import { trackLogin } from './shared';
 import { getCollection } from '../../db';
 import { getWebAuthnOptions, generateChallengeForUser } from '../../auth-utils';
 
@@ -9,11 +7,11 @@ export const loginFirstStep = async (fastify) => {
   const users = await getCollection('users');
 
   fastify.post('/login', async (req, reply) => {
-    const { username, password } = req.body;
+    const { username } = req.body;
     const user = await users.findOne({ username });
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return reply.code(400).send({ error: 'Invalid credentials' });
+    if (!user) {
+      return reply.code(400).send({ error: 'No user found' });
     }
 
     const challenge = generateChallengeForUser(user);
@@ -29,8 +27,6 @@ export const loginFirstStep = async (fastify) => {
           })
         : null;
 
-    await trackLogin(username, req, true);
-
-    reply.send({ success: true, options, mfaRequired: user.otpSecret ? true : false });
+    reply.send({ success: true, options, mfaRequired: Boolean(user.otpSecret) });
   });
 };
