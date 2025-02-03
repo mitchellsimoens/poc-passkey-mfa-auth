@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "docker": "docker compose up -d",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "bun install --cwd backend && bun install --cwd frontend"
   },
   "repository": {
     "type": "git",
