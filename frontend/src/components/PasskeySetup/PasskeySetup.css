@@ -1,0 +1,18 @@
+.passkey-table {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.passkey-header {
+  display: contents;
+  font-weight: bold;
+}
+
+.passkey-row {
+  display: contents;
+}
+
+.passkey-row button {
+  margin: 0;
+}

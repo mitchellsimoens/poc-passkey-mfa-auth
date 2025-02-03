@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { BackendService } from '../services/backend';
 import { decodeToken } from '../utils/auth';
 
-export default function OTPSetup() {
+export default function MFAManager() {
   const [qrCode, setQrCode] = useState('');
   const [otp, setOtp] = useState('');
   const [errorMessage, setErrorMessage] = useState('');

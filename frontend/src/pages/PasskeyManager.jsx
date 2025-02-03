@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import PasskeySetup from '../components/PasskeySetup';
 import { BackendService } from '../services/backend';
 import { decodeToken } from '../utils/auth';
 
@@ -29,14 +30,30 @@ export default function PasskeyManager() {
   return (
     <div>
       <h2>Manage Passkeys</h2>
-      <ul>
+
+      <div className="passkey-table">
+        <div className="passkey-header">
+          <div>ID</div>
+          <div>Name</div>
+          <div>Created At</div>
+          <div>Actions</div>
+        </div>
+
         {passkeys.map((key) => (
-          <li key={key.id}>
-            {key.name || '<Unnamed>'} ({key.id}) Created: {key.createdAt}{' '}
-            <button onClick={() => removePasskey(key.id)}>Remove</button>
-          </li>
+          <div className="passkey-row" key={key.id}>
+            <div>{key.id}</div>
+            <div>{key.name || '<Unnamed>'}</div>
+            <div>{key.createdAt}</div>
+            <div>
+              <button onClick={() => removePasskey(key.id)}>Remove</button>
+            </div>
+          </div>
         ))}
-      </ul>
+      </div>
+
+      <hr />
+
+      <PasskeySetup />
     </div>
   );
 }

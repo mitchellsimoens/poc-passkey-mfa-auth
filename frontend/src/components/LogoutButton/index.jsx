@@ -1,8 +1,10 @@
-import { useNavigate } from 'react-router-dom';
+import { useCookies } from 'react-cookie';
+import { Link, useNavigate } from 'react-router-dom';
 import { BackendService } from '../../services/backend';
 import './LogoutButton.css';
 
 export default function LogoutButton() {
+  const [_a, _b, removeCookie] = useCookies(['name']);
   const navigate = useNavigate();
 
   const logout = async () => {
@@ -12,15 +14,22 @@ export default function LogoutButton() {
       await service.post('/logout');
     } catch {
       // Fallback: manually clear the cookie if server request fails
-      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      removeCookie('token');
+      removeCookie('refreshToken');
     }
 
     navigate('/');
   };
 
   return (
-    <div className="logout-button" onClick={logout}>
+    <Link
+      className="logout-button"
+      onClick={(e) => {
+        e.preventDefault();
+        logout();
+      }}
+    >
       Logout
-    </div>
+    </Link>
   );
 }

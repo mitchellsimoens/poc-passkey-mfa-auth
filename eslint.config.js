@@ -38,7 +38,7 @@ export default [
         'error',
         { blankLine: 'always', prev: ['var', 'const', 'let'], next: ['return', 'block', 'block-like', 'expression'] },
         { blankLine: 'always', prev: ['block', 'block-like'], next: 'return' },
-        { blankLine: 'always', prev: '*', next: 'expression' },
+        // { blankLine: 'always', prev: '*', next: 'expression' },
       ],
       'no-unused-vars': [
         'error',

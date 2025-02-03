@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
-import { BackendService } from '../services/backend';
-import { decodeToken } from '../utils/auth';
+import { BackendService } from '../../services/backend';
+import { decodeToken } from '../../utils/auth';
+import './PasskeySetup.css';
 
 export default function PasskeySetup() {
   const [passkeyName, setPasskeyName] = useState('');
