@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import service from '../services/backend';
+import { BackendService } from '../services/backend';
 import { decodeToken } from '../utils/auth';
 
 export default function SecurityDashboard() {
@@ -8,6 +8,7 @@ export default function SecurityDashboard() {
   const username = decodeToken().username;
 
   const fetchSecurityData = useCallback(async () => {
+    const service = new BackendService();
     const loginsRes = await service.get('/login-history', { username });
     const devicesRes = await service.get('/trusted-devices', { username });
 
@@ -21,6 +22,8 @@ export default function SecurityDashboard() {
   }, [username, fetchSecurityData]);
 
   const removeTrustedDevice = async (deviceId) => {
+    const service = new BackendService();
+
     await service.post('/remove-trusted-device', { username, deviceId });
 
     fetchSecurityData();

@@ -30,7 +30,7 @@ export const loginSecondStep = async (fastify) => {
     const user = await users.findOne({ username });
     const isPasswordValid = password && (await bcrypt.compare(password, user.password));
 
-    // response is present, login is passkey
+    // passkey is present, login is passkey
     if (passkey) {
       // Passkey authentication
       const credential = user.credentials.find((cred) => cred.id === passkey.id);
@@ -42,7 +42,7 @@ export const loginSecondStep = async (fastify) => {
       const currentOptions = await getWebAuthnOptions(user);
 
       const verification = await verifyAuthenticationResponse({
-        passkey,
+        response: passkey,
         expectedOrigin: frontendUrl,
         expectedChallenge: currentOptions.challenge,
         expectedRPID: new URL(frontendUrl).hostname,

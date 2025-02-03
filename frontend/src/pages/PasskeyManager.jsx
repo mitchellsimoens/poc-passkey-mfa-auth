@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import service from '../services/backend';
+import { BackendService } from '../services/backend';
 import { decodeToken } from '../utils/auth';
 
 export default function PasskeyManager() {
   const [passkeys, setPasskeys] = useState([]);
 
   const fetchPasskeys = useCallback(async () => {
+    const service = new BackendService();
     const username = decodeToken().username;
     const res = await service.get('/passkeys', { username });
 
@@ -17,6 +18,7 @@ export default function PasskeyManager() {
   }, [fetchPasskeys]);
 
   const removePasskey = async (credentialId) => {
+    const service = new BackendService();
     const username = decodeToken().username;
 
     await service.post('/remove-passkey', { username, credentialId });

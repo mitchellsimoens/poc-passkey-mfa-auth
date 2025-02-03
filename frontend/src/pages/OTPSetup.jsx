@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import service from '../services/backend';
+import { BackendService } from '../services/backend';
 import { decodeToken } from '../utils/auth';
 
 export default function OTPSetup() {
@@ -8,6 +8,7 @@ export default function OTPSetup() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const enableMFA = async () => {
+    const service = new BackendService();
     const username = decodeToken().username;
     const res = await service.post('/enable-mfa', { username });
 
@@ -17,6 +18,7 @@ export default function OTPSetup() {
   };
 
   const verifyOTP = async () => {
+    const service = new BackendService();
     const username = decodeToken().username;
     const res = await service.post('/verify-mfa', { username, token: otp });
 

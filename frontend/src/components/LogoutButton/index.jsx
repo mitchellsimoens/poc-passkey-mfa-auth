@@ -1,11 +1,14 @@
 import { useNavigate } from 'react-router-dom';
-import service from '../services/backend';
+import { BackendService } from '../../services/backend';
+import './LogoutButton.css';
 
 export default function LogoutButton() {
   const navigate = useNavigate();
 
   const logout = async () => {
     try {
+      const service = new BackendService();
+
       await service.post('/logout');
     } catch {
       // Fallback: manually clear the cookie if server request fails
@@ -15,5 +18,9 @@ export default function LogoutButton() {
     navigate('/');
   };
 
-  return <div onClick={logout}>Logout</div>;
+  return (
+    <div className="logout-button" onClick={logout}>
+      Logout
+    </div>
+  );
 }

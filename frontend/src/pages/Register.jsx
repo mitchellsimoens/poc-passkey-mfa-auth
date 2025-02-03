@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import service from '../services/backend';
+import { BackendService } from '../services/backend';
 
 export default function Register() {
   const [username, setUsername] = useState('');
@@ -7,6 +7,7 @@ export default function Register() {
   const [message, setMessage] = useState('');
 
   const register = async () => {
+    const service = new BackendService();
     const res = await service.post('/register', { username, password });
 
     if (res.success) {
